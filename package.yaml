@@ -21,6 +21,7 @@ description:         A simple Haskell-inspired language
 dependencies:
 - base >= 4.7 && < 5
 - text >= 1.2 && < 1.3
+- containers >= 0.6 && < 0.7
 
 library:
   source-dirs: src

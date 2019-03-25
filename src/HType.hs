@@ -7,12 +7,15 @@ data HType
     | TConstructor String [HType] -- ^ Constructor with generics
     | TFunction HType HType
 
+instance Show HType where
+    show = ppType
 
 ppType :: HType -> String
 ppType ty =
     case ty of
         TNamed n -> n
-        TConstructor name args -> name ++ intercalate " " (map ppTypeParens args)
+        TConstructor name [] -> name
+        TConstructor name args -> name ++ " " ++ intercalate " " (map ppTypeParens args)
         TFunction f x -> ppTypeParens f ++ " -> " ++ ppType x
 
 
@@ -21,5 +24,5 @@ ppTypeParens ty =
     case ty of
         TNamed n -> n
         TConstructor name [] -> name
-        TConstructor name args -> "(" ++ name ++ intercalate " " (map ppType args) ++ ")"
+        TConstructor name args -> "(" ++ name ++ " " ++ intercalate " " (map ppType args) ++ ")"
         TFunction f x -> "(" ++ ppTypeParens f ++ " -> " ++ ppType x ++ ")"
