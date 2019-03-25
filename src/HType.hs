@@ -6,6 +6,7 @@ data HType
     = TNamed String
     | TConstructor String [HType] -- ^ Constructor with generics
     | TFunction HType HType
+    deriving Eq
 
 instance Show HType where
     show = ppType
