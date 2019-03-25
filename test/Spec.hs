@@ -24,10 +24,15 @@ main = foldl1 (>>)
     , testNewVarName
     ]
 
+g2t generics = TypeContext { getGenerics = generics, getVariables = M.empty}
+
 testUnifyTTUtil :: (M.Map String HType, HType, HType) -> (M.Map String HType, HType) -> IO ()
-testUnifyTTUtil (tctx, ty1, ty2) (tctx', ty) =
-    unitTest (show ty1 ++ " <> " ++ show ty2 ++ " {" ++ show tctx ++ "}")
-        (unifyTT tctx ty1 ty2) (Just (tctx', ty))
+testUnifyTTUtil (generics, ty1, ty2) (generics', ty) =
+    let tctx = g2t generics
+        tctx' = g2t generics'
+    in unitTest (show ty1 ++ " <> " ++ show ty2 ++ " {" ++ show tctx ++ "}")
+        (unifyTT tctx ty1 ty2)
+        (Just (tctx', ty))
 
 testUnifyTT :: IO ()
 testUnifyTT = do
@@ -54,8 +59,9 @@ testUnifyTT = do
 
 testNewVarName :: IO ()
 testNewVarName = do
-    unitTest "NewVarName empty" (newVarName M.empty) "a"
+    unitTest "NewVarName empty" (newVarName $ g2t M.empty) "a"
 
-    unitTest "NewVarName some" (newVarName $ M.fromList [("a", undefined), ("b", undefined)]) "c"
+    unitTest "NewVarName some"
+        (newVarName $ g2t $ M.fromList [("a", undefined), ("b", undefined)]) "c"
     unitTest "NewVarName many"
-        (newVarName $ M.fromList $ fmap (\a -> (a, undefined)) $ take 200 varNames) "gs"
+        (newVarName $ g2t $ M.fromList $ fmap (\a -> (a, undefined)) $ take 200 varNames) "gs"

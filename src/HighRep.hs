@@ -29,7 +29,12 @@ data HighBind
     = AVBind String High
     | ATBind String HType
 
-type TypeContext = M.Map String HType
+data TypeContext =
+    TypeContext {
+        getGenerics :: M.Map String HType,
+        getVariables :: M.Map String HType
+    }
+    deriving (Show, Eq)
 
 data TypeError
     = TypeMismatchError (HType, AstCtx) HType
@@ -45,45 +50,36 @@ varNames =
             "" : ((++) <$> varNamesWithEmpty <*> fmap pure letters)
 
 newVarName :: TypeContext -> String
-newVarName tctx = head $ filter (not . flip M.member tctx) varNames
+newVarName tctx = head $ filter (not . flip M.member (getGenerics tctx)) varNames
 
--- unifyAT :: TypeContext -> Ast -> HType -> Either TypeError (TypeContext, HType)
--- unifyAT tctx (RepTree actx ast) ty =
---     let unifyTTWithCtx wanted =
---             case unifyTT tctx ty wanted of
---                 Just x -> Right x
---                 Nothing -> Left $ TypeMismatchError (ty, actx) wanted
---     case ast of
---         ABottom -> unifyTTWithCtx $ TConstructor "Bottom" []
---         AVar -> unifyTTWithCtx $ TConstructor "Bottom" []
 
 unifyTT :: TypeContext -> HType -> HType -> Maybe (TypeContext, HType)
 unifyTT tctx t1 t2 =
     case (t1, t2) of
         (TNamed a, TNamed b) | a == b -> Just (tctx, t1)
         (TNamed a, TNamed b) ->
-            case (M.lookup a tctx, M.lookup b tctx) of
+            case (M.lookup a $ getGenerics tctx, M.lookup b $ getGenerics tctx) of
                 (Just t1', Just t2') -> unifyTT tctx t1' t2'
                 (Just t1', Nothing) ->
-                    let tctx' = M.insert b t1' tctx
+                    let tctx' = tctx { getGenerics = M.insert b t1' $ getGenerics tctx }
                     in Just (tctx', t1')
                 (Nothing, Just t2') ->
-                    let tctx' = M.insert b t2' tctx
+                    let tctx' = tctx { getGenerics = M.insert b t2' $ getGenerics tctx }
                     in Just (tctx', t2')
                 (Nothing, Nothing) ->
-                    let tctx' = M.insert b t1 tctx
+                    let tctx' = tctx { getGenerics = M.insert b t1 $ getGenerics tctx }
                     in Just (tctx', t1)
         (TNamed a, _) ->
-            case M.lookup a tctx of
+            case M.lookup a $ getGenerics tctx of
                 Just t1' -> unifyTT tctx t1' t2
                 Nothing ->
-                    let tctx' = M.insert a t2 tctx
+                    let tctx' = tctx { getGenerics = M.insert a t2 $ getGenerics tctx }
                     in Just (tctx', t2)
         (_, TNamed b) ->
-            case M.lookup b tctx of
+            case M.lookup b $ getGenerics tctx of
                 Just t1' -> unifyTT tctx t1' t2
                 Nothing ->
-                    let tctx' = M.insert b t1 tctx
+                    let tctx' = tctx { getGenerics = M.insert b t1 $ getGenerics tctx }
                     in Just (tctx', t1)
         (TConstructor acons aargs, TConstructor bcons bargs)
             | acons == bcons && length aargs == length bargs ->
