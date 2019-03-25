@@ -35,7 +35,17 @@ data TypeError
     = TypeMismatchError (HType, AstCtx) HType
 
 
+letters = "abcdefghijklmnopqrstuvqxyz"
 
+varNames :: [String]
+varNames =
+    tail varNamesWithEmpty
+    where
+        varNamesWithEmpty =
+            "" : ((++) <$> varNamesWithEmpty <*> fmap pure letters)
+
+newVarName :: TypeContext -> String
+newVarName tctx = head $ filter (not . flip M.member tctx) varNames
 
 -- unifyAT :: TypeContext -> Ast -> HType -> Either TypeError (TypeContext, HType)
 -- unifyAT tctx (RepTree actx ast) ty =
