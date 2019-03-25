@@ -26,8 +26,8 @@ data HighCtx =
     deriving Show
 
 data HighBind
-    = AVBind String High
-    | ATBind String HType
+    = HVBind String High
+    | HTBind String HType
 
 data TypeContext =
     TypeContext {

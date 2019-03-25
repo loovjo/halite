@@ -3,6 +3,8 @@ module Lib where
 import Ast
 import Parse
 import Parser
+import HighRep
+import HType
 
 import System.IO
 import qualified Data.Text as T
@@ -32,6 +34,12 @@ repl =
                     if len == T.length inp
                         then do
                             putStrLn $ "Parsed: " ++ apprint 0 ast
+                            case unifyAT emptyTCtx ast $ TNamed "main" of
+                                Right (ctx', ty) ->
+                                    putStrLn $ "Type: " ++ show ty ++ ", ctx: " ++ show ctx'
+                                Left e ->
+                                    putStrLn $ "Type error: " ++ show e
+
                         else putStrLn "Not all parsed!"
                 Left errs ->
                     mapM_ (showErr 0 (T.lines inp)) errs

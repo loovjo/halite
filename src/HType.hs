@@ -9,7 +9,7 @@ data HType
     deriving Eq
 
 instance Show HType where
-    show = ppType
+    show = ppTypeParens
 
 ppType :: HType -> String
 ppType ty =

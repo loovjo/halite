@@ -17,6 +17,9 @@ data AstBranch
     | ALambda [String] Ast
     | ACall [Ast]
 
+instance Show AstBranch where
+    show = apprint 0 . RepTree (AstCtx {cspan=(-1,-1)})
+
 data AstCtx =
     AstCtx { cspan :: (Int, Int) }
     deriving Show
