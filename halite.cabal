@@ -4,30 +4,30 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 696abda71713ab5573ee123d0616b8105289b0b780dc33b76532091b7bab9978
+-- hash: 2642aa60fdd4c6abe35a4b3be2b0e6165c59f480b3734f085a0ab4606369d9d1
 
 name:           halite
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/halite#readme>
-homepage:       https://github.com/githubuser/halite#readme
-bug-reports:    https://github.com/githubuser/halite/issues
-author:         Author name here
+description:    A simple Haskell-inspired language
+homepage:       https://github.com/loovjo/halite#readme
+bug-reports:    https://github.com/loovjo/halite/issues
+author:         Jonathan Lööv
 maintainer:     example@example.com
-copyright:      2019 Author name here
+copyright:      2019 
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
     README.md
-    ChangeLog.md
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/halite
+  location: https://github.com/loovjo/halite
 
 library
   exposed-modules:
       Ast
+      HighRep
       HType
       Lib
       Parse
@@ -39,6 +39,7 @@ library
       src
   build-depends:
       base >=4.7 && <5
+    , containers >=0.6 && <0.7
     , text >=1.2 && <1.3
   default-language: Haskell2010
 
@@ -51,6 +52,7 @@ executable halite-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , containers >=0.6 && <0.7
     , halite
     , text >=1.2 && <1.3
   default-language: Haskell2010
@@ -65,6 +67,7 @@ test-suite halite-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , containers >=0.6 && <0.7
     , halite
     , text >=1.2 && <1.3
   default-language: Haskell2010
