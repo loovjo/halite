@@ -34,7 +34,7 @@ repl =
                     if len == T.length inp
                         then do
                             putStrLn $ "Parsed: " ++ apprint 0 ast
-                            case unifyAT emptyTCtx ast $ TNamed "main" of
+                            case unifyAT emptyTCtx ast TUnknown of
                                 Right (ctx', ty) ->
                                     putStrLn $ "Type: " ++ show ty ++ ", ctx: " ++ show ctx'
                                 Left e ->
