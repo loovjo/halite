@@ -4,10 +4,11 @@ module Parse where
 
 import Parser
 import Ast
-import HType
+import Type
 import RepTree
 
 import qualified Data.Text as T
+import qualified Data.Map as M
 import Data.Char
 import Data.List
 import Data.Traversable
@@ -140,38 +141,43 @@ parseTBind :: Parser HParseError ABind
 parseTBind = do
     v <- matchVName
     token $ matchText $ T.pack "::"
-    t <- parseType
+    t <- parsePolyType
     return $ ATBind v t
 
-parseType :: Parser HParseError HType
-parseType =
+parsePolyType :: Parser HParseError PolyType
+parsePolyType = do
+    mty <- parseMonoType
+    return $ bindFrees mty
+
+parseMonoType :: Parser HParseError MonoType
+parseMonoType =
     foldl1' (<|>)
-        [ parseTFunc
-        , parseTNamed
-        , parseTCons
-        , parens parseType ]
+        [ parseMonoFunc
+        , parseMonoVar
+        , parseMonoCons
+        , parens parseMonoType ]
 
-parseTypeLazy :: Parser HParseError HType
-parseTypeLazy =
+parseMonoTypeLazy :: Parser HParseError MonoType
+parseMonoTypeLazy =
     foldl1' (<|>)
-        [ parseTNamed
-        , parseTCons
-        , parens parseType ]
+        [ parseMonoVar
+        , parseMonoCons
+        , parens parseMonoType ]
 
-parseTNamed :: Parser HParseError HType
-parseTNamed = TNamed <$> token matchVName
+parseMonoVar :: Parser HParseError MonoType
+parseMonoVar = TVar <$> token matchVName
 
-parseTCons :: Parser HParseError HType
-parseTCons = do
+parseMonoCons :: Parser HParseError MonoType
+parseMonoCons = do
     h <- token matchCName
-    rest <- many parseTypeLazy
+    rest <- many parseMonoTypeLazy
     return $ TConstructor h rest
 
-parseTFunc :: Parser HParseError HType
-parseTFunc = do
-    f <- parseTypeLazy
+parseMonoFunc :: Parser HParseError MonoType
+parseMonoFunc = do
+    f <- parseMonoTypeLazy
     matchText $ T.pack "->"
-    x <- parseType
+    x <- parseMonoType
     return $ TFunction f x
 
 

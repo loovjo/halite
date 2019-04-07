@@ -4,7 +4,8 @@ import Ast
 import Parse
 import Parser
 import HighRep
-import HType
+import Type
+import TypeSolver
 
 import System.IO
 import qualified Data.Text as T
@@ -34,7 +35,7 @@ repl =
                     if len == T.length inp
                         then do
                             putStrLn $ "Parsed: " ++ apprint 0 ast
-                            case unifyAT emptyTCtx ast TUnknown of
+                            case getType defaultContext ast of
                                 Right (ctx', ty) ->
                                     putStrLn $ "Type: " ++ show ty ++ ", ctx: " ++ show ctx'
                                 Left e ->

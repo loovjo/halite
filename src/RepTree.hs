@@ -5,3 +5,4 @@ module RepTree
 
 data RepTree ctx cnt =
     RepTree ctx cnt
+    deriving Show

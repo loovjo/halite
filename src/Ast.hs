@@ -1,10 +1,9 @@
 module Ast where
 
 import RepTree
-import HType
+import Type
 
 import Data.List
-
 
 type Ast = RepTree AstCtx AstBranch
 
@@ -26,7 +25,7 @@ data AstCtx =
 
 data ABind
     = AVBind String Ast
-    | ATBind String HType
+    | ATBind String PolyType
 
 indentOf :: Int -> String
 indentOf x = take (x * 4) $ cycle " "
@@ -60,4 +59,4 @@ ppbind :: Int -> ABind -> String
 ppbind i bind =
     case bind of
         AVBind v e -> v ++ " = " ++ apprint (i + 2) e ++ ";"
-        ATBind v t -> v ++ " :: " ++ ppType t
+        ATBind v t -> v ++ " :: " ++ show t
