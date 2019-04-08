@@ -26,7 +26,7 @@ instance Show PolyType where
     show (PolyType { forAll=fa, inner=mon}) =
         if S.size fa == 0
             then show mon
-            else "forall " ++ (intercalate " " $ S.toList fa) ++ ". " ++ show mon
+            else "(∀ " ++ (intercalate " " $ S.toList fa) ++ ". " ++ show mon ++ ")"
 
 instance Show MonoType where
     show = showMonoParens
@@ -68,19 +68,19 @@ letters = "abcdefghijklmnopqrstuvqxyz"
 varNames :: [String]
 varNames = [1..] >>= flip replicateM letters
 
-renameAllFrees :: S.Set String -> PolyType -> PolyType
-renameAllFrees taken p =
+renameForAlls :: S.Set String -> PolyType -> PolyType
+renameForAlls taken p =
     PolyType { inner = ty, forAll = fa }
     where
         update var (ty, fa) =
-            let taken' = taken `S.union` fa
+            let taken' = taken `S.union` (S.delete var fa)
             in if var `S.member` taken'
                 then
                     let var' = head $ filter (not . flip S.member taken') varNames
                         ty' = renameFree var var' ty
-                    in (ty', S.insert var' fa)
-                else (ty, S.insert var fa)
-        (ty, fa) = foldr update (inner p, S.empty) (forAll p)
+                    in (ty', S.insert var' (S.delete var fa))
+                else (ty, fa)
+        (ty, fa) = foldr update (inner p, forAll p) (forAll p)
 
 
 
@@ -90,4 +90,5 @@ data TypeError
     | GensMismatch [(String, (MonoType, MonoType))]
     | InfiniteType String MonoType
     | UnboundVar String
-    deriving Show
+    deriving (Show, Eq)
+

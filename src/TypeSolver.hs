@@ -1,5 +1,6 @@
 module TypeSolver where
 
+import Data.List
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Control.Applicative
@@ -10,21 +11,31 @@ import Type
 import Ast
 import RepTree
 
-type Substitution = M.Map String MonoType
+data Substitution =
+    Substitution { subMap :: M.Map String MonoType }
+    deriving Eq
+
+instance Show Substitution where
+    show sub =
+        "[" ++
+            intercalate "," (map (\(v, t) -> v ++ "/" ++ show t) $ M.toList $ subMap sub)
+        ++ "]"
+
+emptySub = Substitution M.empty
 
 compose :: Substitution -> Substitution -> Either TypeError Substitution
 compose s1 s2 =
-    let inter = M.intersectionWith (,) s1 s2
+    let inter = M.intersectionWith (,) (subMap s1) (subMap s2)
     in if M.size inter == 0
-        then Right $ M.union s1 s2
+        then Right $ Substitution $ M.union (subMap s1) (subMap s2)
         else
             let firstName = (M.keys inter !! 0)
                 (t1, t2) = inter M.! firstName
             in do
                 sub <- unifyMonos t1 t2
                 let t = applySub sub t1
-                    s1' = M.insert firstName t s1
-                    s2' = M.delete firstName s2
+                    s1' = Substitution $ M.insert firstName t (subMap s1)
+                    s2' = Substitution $ M.delete firstName (subMap s2)
 
                 s <- compose s1' s2'
                 compose s sub
@@ -35,7 +46,7 @@ class Substitutable a where
 
 instance Substitutable MonoType where
     applySub sub (TVar x) =
-        case M.lookup x sub of
+        case M.lookup x $ subMap sub of
             Just a -> applySub sub a
             Nothing -> TVar x
     applySub sub (TConstructor name params) =
@@ -46,7 +57,7 @@ instance Substitutable MonoType where
 instance Substitutable PolyType where
     applySub sub ty =
         ty {
-            inner = applySub (M.withoutKeys sub (forAll ty)) $ inner ty
+            inner = applySub (Substitution $ M.withoutKeys (subMap sub) (forAll ty)) $ inner ty
         }
 
 data TypeContext = TypeContext { varTypes :: M.Map String PolyType}
@@ -70,11 +81,11 @@ unifyMonos :: MonoType -> MonoType -> Either TypeError Substitution
 unifyMonos (TVar a) x =
     if S.member a $ vars x
         then Left $ InfiniteType a x
-        else Right $ M.singleton a x
+        else Right $ Substitution $ M.singleton a x
 unifyMonos x (TVar a) =
     if S.member a $ vars x
         then Left $ InfiniteType a x
-        else Right $ M.singleton a x
+        else Right $ Substitution $ M.singleton a x
 unifyMonos t1@(TConstructor c1 params1) t2@(TConstructor c2 params2)
     | c1 /= c2 || length params1 /= length params2 = Left $ MonoTypeMismatch t1 t2
     | otherwise =
@@ -83,7 +94,7 @@ unifyMonos t1@(TConstructor c1 params1) t2@(TConstructor c2 params2)
                 (Right subs1, Right subs2) -> compose subs1 subs2
                 (Left e, _) -> Left e
                 (_, Left e) -> Left e
-        ) (Right M.empty) $ zip params1 params2
+        ) (Right emptySub) $ zip params1 params2
 unifyMonos (TFunction f1 x1) (TFunction f2 x2) = do
         s1 <- unifyMonos f1 f2
         s2 <- unifyMonos x1 x2
@@ -124,19 +135,19 @@ defaultContext =
 
 getType :: TypeContext -> Ast -> Either TypeError (Substitution, PolyType)
 getType _ (RepTree _ ABottom) =
-    Right (M.empty, PolyType {forAll=S.empty, inner=TConstructor "Bottom" []})
+    Right (emptySub, PolyType {forAll=S.empty, inner=TConstructor "Bottom" []})
 
 getType _ (RepTree _ (ANum _)) =
-    Right (M.empty, PolyType {forAll=S.empty, inner=TConstructor "Int" []})
+    Right (emptySub, PolyType {forAll=S.empty, inner=TConstructor "Int" []})
 
 getType tctx (RepTree _ (AVar name)) =
     case M.lookup name $ varTypes tctx of
-        Just ty -> Right (M.empty, ty)
+        Just ty -> Right (emptySub, ty)
         Nothing -> Left $ UnboundVar name
 
 getType tctx (RepTree _ (AConstructor name)) =
     case M.lookup name $ varTypes tctx of
-        Just ty -> Right (M.empty, ty)
+        Just ty -> Right (emptySub, ty)
         Nothing -> Left $ UnboundVar name
 
 getType tctx (RepTree _ (ALambda [] body)) = getType tctx body
