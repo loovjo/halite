@@ -50,7 +50,7 @@ apprint i (RepTree ctx part) =
                 ALambda vars body ->
                     let ppvars = intercalate " " vars
                         ppbody = apprint (i + 1) body
-                    in "λ" ++ ppvars ++ ". " ++ ppbody
+                    in "(λ" ++ ppvars ++ ". " ++ ppbody ++ ")"
                 ACall fs ->
                     let ppfs = concatMap (\v -> apprint (i + 1) v ++ " ") fs
                     in "(" ++ (take (length ppfs - 1) ppfs) ++ ")"

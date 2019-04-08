@@ -44,7 +44,10 @@ instance Substitutable MonoType where
         TFunction (applySub sub f) (applySub sub x)
 
 instance Substitutable PolyType where
-    applySub sub = mapInner (applySub sub)
+    applySub sub ty =
+        ty {
+            inner = applySub (M.withoutKeys sub (forAll ty)) $ inner ty
+        }
 
 data TypeContext = TypeContext { varTypes :: M.Map String PolyType}
 
@@ -103,6 +106,18 @@ defaultContext =
                         )
                 })
             , ("id", PolyType { forAll = S.singleton "a", inner=TFunction (TVar "a") (TVar "a")})
+            , ("add", PolyType {
+                forAll = S.empty,
+                inner=TFunction
+                    (TConstructor "Int" [])
+                    (TFunction (TConstructor "Int" []) (TConstructor "Int" []))
+                } )
+            , ("inc", PolyType {
+                forAll = S.empty,
+                inner=TFunction
+                    (TConstructor "Int" [])
+                    (TConstructor "Int" [])
+                } )
             ]
     }
 
@@ -138,22 +153,3 @@ getType tctx (RepTree x (ALambda (var:vars) body)) = do
                 }
 
     return (sub, res)
-
-getType tctx (RepTree _ (ACall [f])) = getType tctx f
-getType tctx (RepTree x (ACall calls)) =
-    let func = RepTree x (ACall $ init calls)
-        arg = last calls
-    in do
-
-        -- Might want to care about forAlls?
-        (s1, PolyType {inner=funcT, forAll=fa }) <- getType tctx func
-        (s2, polyArgT) <- getType tctx arg
-
-        let PolyType {inner=argT, forAll=fa'} = renameAllFrees fa (applySub s2 polyArgT)
-        let resV = head $ filter (not . flip S.member (S.union fa fa')) varNames
-
-        s4 <- unifyMonos funcT (TFunction argT (TVar resV))
-
-        let resT = bindFrees $ applySub s4 (TVar resV)
-
-        return (s4, resT)
