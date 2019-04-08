@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 564d15f52037ac14ba33ac99367041a0e8cbc221e3e59cceaaeb59b501355a89
+-- hash: 813d3e8a64ca94cd20f38442d72c1598b750130b192ccc860a9982de0f949ad7
 
 name:           halite
 version:        0.1.0.0
@@ -62,6 +62,9 @@ test-suite halite-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      TestLib
+      TestTypes
+      TestTypeSolver
       Paths_halite
   hs-source-dirs:
       test
