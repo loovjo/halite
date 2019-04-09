@@ -82,7 +82,13 @@ renameForAlls taken p =
                 else (ty, fa)
         (ty, fa) = foldr update (inner p, forAll p) (forAll p)
 
-
+combinePoly :: (MonoType -> MonoType -> MonoType) -> PolyType -> PolyType -> PolyType
+combinePoly f p1 p2 =
+    let p2' = renameForAlls (forAll p1) p2
+    in PolyType {
+        forAll = forAll p1 `S.union` forAll p2,
+        inner = inner p1 `f` inner p2
+    }
 
 data TypeError
     = PolyTypeMismatch PolyType PolyType

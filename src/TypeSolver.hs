@@ -60,20 +60,25 @@ instance Substitutable PolyType where
             inner = applySub (Substitution $ M.withoutKeys (subMap sub) (forAll ty)) $ inner ty
         }
 
-data TypeContext = TypeContext { varTypes :: M.Map String PolyType}
+data TypeContext =
+    TypeContext {
+        varTypes :: M.Map String PolyType
+    }
+    deriving (Show)
 
 instance Substitutable TypeContext where
     applySub sub tctx = tctx { varTypes = M.map (mapInner (applySub sub)) $ varTypes tctx }
 
 insertVar :: String -> PolyType -> TypeContext -> TypeContext
 insertVar name ty tctx =
-    tctx { varTypes = M.insert name ty $ varTypes tctx }
+    let frees = S.fromList (concatMap (S.toList . freeVars . snd) $ M.toList $ varTypes tctx)
+    in if 0 == S.size ( freeVars ty `S.intersection` frees )
+        then tctx { varTypes = M.insert name ty $ varTypes tctx }
+        else error ("Trying to insert " ++ name ++ "=" ++ show ty ++ " in " ++ show tctx)
 
 newVarName :: TypeContext -> String
 newVarName tctx =
-    let innerNames = mconcat $ fmap (vars . inner . snd) $ M.toList $ varTypes tctx
-        outerNames = M.keysSet $ varTypes tctx
-        names = innerNames <> outerNames
+    let names = mconcat $ fmap (freeVars . snd) $ M.toList $ varTypes tctx
     in head $ filter (flip S.notMember names) varNames
 
 
@@ -157,10 +162,8 @@ getType tctx (RepTree x (ALambda (var:vars) body)) = do
 
     (sub, bodyT) <- getType tctx' (RepTree x (ALambda vars body))
 
-    let res =
-            PolyType
-                { forAll = S.insert newVar $ forAll bodyT
-                , inner = TFunction (applySub sub $ TVar newVar) (inner bodyT)
-                }
+    let varT = applySub sub (TVar newVar)
+        sub' = Substitution $ M.delete newVar $ subMap sub
 
-    return (sub, res)
+
+    return (sub', combinePoly TFunction (bindFrees varT) bodyT)
