@@ -4,6 +4,8 @@ import Data.List
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Control.Applicative
+import Control.Monad.State.Lazy
+import Control.Monad.Except
 
 import Debug.Trace
 
@@ -20,6 +22,20 @@ instance Show Substitution where
         "[" ++
             intercalate "," (map (\(v, t) -> v ++ "/" ++ show t) $ M.toList $ subMap sub)
         ++ "]"
+
+data TypeSolverState =
+    TypeSolverState {
+        currentVarID :: Int
+    }
+    deriving (Show)
+
+initTypeSolverState = TypeSolverState { currentVarID = 0 }
+
+freshVar :: ExceptT e (State TypeSolverState) String
+freshVar = do
+    current <- currentVarID <$> get
+    modify (\tss -> tss { currentVarID = succ current })
+    return (varNames !! current)
 
 emptySub = Substitution M.empty
 
@@ -76,11 +92,6 @@ insertVar name ty tctx =
         then tctx { varTypes = M.insert name ty $ varTypes tctx }
         else error ("Trying to insert " ++ name ++ "=" ++ show ty ++ " in " ++ show tctx)
 
-newVarName :: TypeContext -> String
-newVarName tctx =
-    let names = mconcat $ fmap (freeVars . snd) $ M.toList $ varTypes tctx
-    in head $ filter (flip S.notMember names) varNames
-
 
 unifyMonos :: MonoType -> MonoType -> Either TypeError Substitution
 unifyMonos (TVar a) x =
@@ -104,7 +115,9 @@ unifyMonos (TFunction f1 x1) (TFunction f2 x2) = do
         s1 <- unifyMonos f1 f2
         s2 <- unifyMonos x1 x2
         compose s1 s2
-unifyMonos a b = Left $ MonoTypeMismatch a b
+unifyMonos a b
+    | a == b = Right $ Substitution M.empty
+    | otherwise = Left $ MonoTypeMismatch a b
 
 defaultContext =
     TypeContext {
@@ -134,36 +147,77 @@ defaultContext =
                     (TConstructor "Int" [])
                     (TConstructor "Int" [])
                 } )
+            , ("revApp", PolyType {
+                forAll = S.fromList ["a", "b"],
+                inner=TFunction
+                    (TVar "a")
+                    (TFunction
+                        (TFunction (TVar "a") (TVar "b"))
+                        (TVar "b")
+                    )
+                } )
             ]
     }
 
-
 getType :: TypeContext -> Ast -> Either TypeError (Substitution, PolyType)
-getType _ (RepTree _ ABottom) =
-    Right (emptySub, PolyType {forAll=S.empty, inner=TConstructor "Bottom" []})
+getType tctx a =
+    fst $ runState (runExceptT $ getTypeM tctx a) initTypeSolverState
 
-getType _ (RepTree _ (ANum _)) =
-    Right (emptySub, PolyType {forAll=S.empty, inner=TConstructor "Int" []})
+getTypeM :: TypeContext -> Ast -> ExceptT TypeError (State TypeSolverState) (Substitution, PolyType)
+getTypeM _ (RepTree _ ABottom) =
+    return (emptySub, PolyType {forAll=S.empty, inner=TConstructor "Bottom" []})
 
-getType tctx (RepTree _ (AVar name)) =
+getTypeM _ (RepTree _ (ANum _)) =
+    return (emptySub, PolyType {forAll=S.empty, inner=TConstructor "Int" []})
+
+getTypeM tctx (RepTree _ (AVar name)) =
     case M.lookup name $ varTypes tctx of
-        Just ty -> Right (emptySub, ty)
-        Nothing -> Left $ UnboundVar name
+        Just ty -> return (emptySub, ty)
+        Nothing -> throwError $ UnboundVar name
 
-getType tctx (RepTree _ (AConstructor name)) =
+getTypeM tctx (RepTree _ (AConstructor name)) =
     case M.lookup name $ varTypes tctx of
-        Just ty -> Right (emptySub, ty)
-        Nothing -> Left $ UnboundVar name
+        Just ty -> return (emptySub, ty)
+        Nothing -> throwError $ UnboundVar name
 
-getType tctx (RepTree _ (ALambda [] body)) = getType tctx body
-getType tctx (RepTree x (ALambda (var:vars) body)) = do
-    let newVar = newVarName tctx
+getTypeM tctx (RepTree _ (ALambda [] body)) = getTypeM tctx body
+getTypeM tctx (RepTree x (ALambda (var:vars) body)) = do
+    newVar <- freshVar
     let tctx' = insertVar var (PolyType {forAll=S.empty, inner=TVar newVar}) tctx
 
-    (sub, bodyT) <- getType tctx' (RepTree x (ALambda vars body))
+    (sub, bodyT) <- getTypeM tctx' (RepTree x (ALambda vars body))
 
     let varT = applySub sub (TVar newVar)
         sub' = Substitution $ M.delete newVar $ subMap sub
 
-
     return (sub', combinePoly TFunction (bindFrees varT) bodyT)
+
+
+getTypeM tctx (RepTree _ (ACall [f])) = getTypeM tctx f
+getTypeM tctx (RepTree ctx (ACall fs)) = do
+    let f = RepTree ctx (ACall (init fs))
+        x = last fs
+
+    (s1, fType) <- getTypeM tctx f
+    (s2, xType) <- getTypeM tctx x
+
+    let xType' = applySub s1 xType
+    let fType' = applySub s2 fType
+
+    let xType'' = renameForAlls (forAll fType') xType'
+
+    s12 <- liftEither (s1 `compose` s2)
+
+    resName <- freshVar
+
+    sub <- liftEither $ unifyMonos (inner fType') (TFunction (inner xType'') (TVar resName))
+
+    let res = applySub sub (TVar resName)
+        fa = forAll fType `S.difference` M.keysSet (subMap sub)
+        sub' = Substitution $ M.delete resName $ subMap sub
+
+    subRes <- liftEither (s12 `compose` sub')
+
+
+    return (subRes, PolyType { forAll = fa, inner = res })
+
