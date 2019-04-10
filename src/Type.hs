@@ -4,6 +4,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Monad
 import Data.List
+import Data.Ord
 
 -- A type with (maybe) free variables
 data MonoType
@@ -89,6 +90,19 @@ combinePoly f p1 p2 =
         forAll = forAll p1 `S.union` forAll p2,
         inner = inner p1 `f` inner p2
     }
+
+lowerForAlls :: PolyType -> PolyType
+lowerForAlls p =
+    PolyType { inner = ty, forAll = fa }
+    where
+        update var (ty, currentForAlls) =
+            let var' = head $ filter (not . flip S.member currentForAlls) varNames
+                ty' = renameFree var var' ty
+            in (ty', S.insert var' currentForAlls)
+        (ty, fa) = foldr update
+            (inner p, S.empty)
+            -- TODO: Optimize
+            (sortOn (Down . flip elemIndex varNames) $ S.toList $ forAll p)
 
 data TypeError
     = PolyTypeMismatch PolyType PolyType

@@ -14,6 +14,7 @@ testTypes = sequence_
     , testFreeVars
     , testBindFrees
     , testRenameForAlls
+    , testLowerForAlls
     ]
 
 testVars = do
@@ -62,4 +63,15 @@ testRenameForAlls = do
         ( PolyType {
             inner = TConstructor "Int" [TVar "e", TVar "b", TVar "d", TVar "z"],
             forAll = S.fromList ["d", "b", "e", "z"]
+        })
+
+testLowerForAlls = do
+    unitTestFunc "lowerForAlls" lowerForAlls
+        PolyType {
+            inner = TConstructor "T" [TVar "x", TVar "hej", TVar "bla", TVar "boi"],
+            forAll = S.fromList ["x", "hej", "bla", "boi"]
+        }
+        ( PolyType {
+            inner = TConstructor "T" [TVar "a", TVar "d", TVar "b", TVar "c"],
+            forAll = S.fromList ["a", "b", "c", "d"]
         })
