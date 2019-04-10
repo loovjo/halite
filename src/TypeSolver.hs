@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 module TypeSolver where
 
 import Data.List
@@ -221,3 +223,26 @@ getTypeM tctx (RepTree ctx (ACall fs)) = do
 
     return (subRes, PolyType { forAll = fa, inner = res })
 
+getTypeM tctx (RepTree _ (ALet binds exp)) = do
+    let boundTypes = M.fromList $ tBinds binds
+        tctx' = M.foldrWithKey
+                (\name ty tctx -> tctx { varTypes = M.insert name ty $ varTypes tctx })
+                tctx boundTypes
+        boundVars = vBinds binds
+
+    boundVarUni <- sequence $ (\(name, val) -> (name, ) <$> getTypeM tctx' val) <$> boundVars
+
+    let subs = (fst . snd) <$> boundVarUni
+    composed <- liftEither $ foldr (\sub composed -> composed >>= compose sub) (Right emptySub) subs
+
+    let boundVarTypes = (snd <$>) <$> boundVarUni
+
+    let tctx'' = foldr
+                (\(name, ty) tctx -> tctx { varTypes = M.insert name ty $ varTypes tctx })
+                tctx' boundVarTypes
+
+    (tSub, res) <- getTypeM tctx'' exp
+
+    rSub <- liftEither $ composed `compose` composed
+
+    return (rSub, applySub composed res)
