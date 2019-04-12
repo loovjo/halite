@@ -97,6 +97,11 @@ insertVar name ty tctx =
 
 
 unifyMonos :: MonoType -> MonoType -> Either TypeError Substitution
+
+unifyMonos (TVar a) (TVar b) =
+    if a == b
+        then Right emptySub
+        else Right $ Substitution $ M.singleton a (TVar b)
 unifyMonos (TVar a) x =
     if S.member a $ vars x
         then Left $ InfiniteType a x
@@ -125,9 +130,8 @@ unifyMonos a b
 defaultContext =
     TypeContext {
         varTypes = M.fromList
-            [ ("Int", PolyType {forAll=S.empty, inner=TConstructor "Int" []})
-            , ("LEmpty", PolyType {forAll=S.singleton "a", inner=TConstructor "List" [TVar "a"]})
-            , ("LCons", PolyType {
+            [ ("empty", PolyType {forAll=S.singleton "a", inner=TConstructor "List" [TVar "a"]})
+            , ("cons", PolyType {
                 forAll=S.singleton "a",
                 inner =
                     TFunction
@@ -136,6 +140,15 @@ defaultContext =
                             (TConstructor "List" [TVar "a"])
                             (TConstructor "List" [TVar "a"])
                         )
+                })
+            , ("map", PolyType {
+                forAll=S.fromList ["a", "b"],
+                inner =
+                    TFunction
+                        (TFunction (TVar "a") (TVar "b"))
+                        $ TFunction
+                            (TConstructor "List" [TVar "a"])
+                            (TConstructor "List" [TVar "b"])
                 })
             , ("id", PolyType { forAll = S.singleton "a", inner=TFunction (TVar "a") (TVar "a")})
             , ("add", PolyType {
@@ -241,8 +254,9 @@ getTypeM tctx (RepTree _ (ALet binds exp)) = do
                         case M.lookup name $ varTypes tctx of
                             Nothing -> Right $ insertVar name ty tctx
                             Just ty' -> do
-                                sub <- unifyMonos (inner ty) (inner ty')
-                                if applySub sub (inner ty) == inner ty'
+                                let ty'' = renameForAlls (forAll ty) ty'
+                                sub <- unifyMonos (inner ty) (inner ty'')
+                                if applySub sub (inner ty) == inner ty''
                                     then Right tctx
                                     else Left $ PolyTypeMismatch ty ty'
                     )
