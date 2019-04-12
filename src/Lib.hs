@@ -10,6 +10,9 @@ import TypeSolver
 import System.IO
 import qualified Data.Text as T
 
+showErr i [] (err, idx) = do
+    putStrLn $ show (i + 1) ++ " | " ++ show err
+    putStrLn ""
 
 showErr i (line:rest) (err, idx) =
     if idx > T.length line
