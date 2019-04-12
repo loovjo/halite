@@ -31,7 +31,8 @@ data TypeSolverState =
     }
     deriving (Show)
 
-initTypeSolverState = TypeSolverState { currentVarID = 0 }
+-- Start with cvid = 2 to avoid collisions with defaultContext
+initTypeSolverState = TypeSolverState { currentVarID = 2 }
 
 freshVar :: ExceptT e (State TypeSolverState) String
 freshVar = do
