@@ -54,8 +54,7 @@ intoParseAst parser =
 parseLazy :: Parser HParseError Ast
 parseLazy =
     token $ foldl1' (<|>)
-        [ parseBottom
-        , parseConstructor
+        [ parseConstructor
         , parseVar
         , parseNum
         , parseLet
@@ -73,12 +72,8 @@ parseAst =
         , parseVar
         , parseNum
         , parseConstructor
-        , parseBottom
         , parens parseAst
         ]
-
-parseBottom :: Parser HParseError Ast
-parseBottom = intoParseAst (ABottom <$ (token $ matchChar '!'))
 
 parseVar :: Parser HParseError Ast
 parseVar =

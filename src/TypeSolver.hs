@@ -165,10 +165,6 @@ getType :: TypeContext -> Ast -> Either TypeError (Substitution, PolyType)
 getType tctx a =
     fst $ runState (runExceptT $ getTypeM tctx a) initTypeSolverState
 
-getTypeM :: TypeContext -> Ast -> ExceptT TypeError (State TypeSolverState) (Substitution, PolyType)
-getTypeM _ (RepTree _ ABottom) =
-    return (emptySub, PolyType {forAll=S.empty, inner=TConstructor "Bottom" []})
-
 getTypeM _ (RepTree _ (ANum _)) =
     return (emptySub, PolyType {forAll=S.empty, inner=TConstructor "Int" []})
 

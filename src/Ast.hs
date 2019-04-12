@@ -8,8 +8,7 @@ import Data.List
 type Ast = RepTree AstCtx AstBranch
 
 data AstBranch
-    = ABottom
-    | AVar String
+    = AVar String
     | ANum Int
     | AConstructor String
     | ALet [ABind] Ast
@@ -37,7 +36,6 @@ apprint i (RepTree ctx part) =
         indent = indentOf i
         appprint part =
             case part of
-                ABottom -> "!"
                 AVar x -> x
                 ANum x -> show x
                 AConstructor x -> x
