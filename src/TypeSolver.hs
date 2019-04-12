@@ -223,6 +223,7 @@ getTypeM tctx (RepTree ctx (ACall fs)) = do
 
     return (subRes, PolyType { forAll = fa, inner = res })
 
+
 getTypeM tctx (RepTree _ (ALet binds exp)) = do
     let boundTypes = M.fromList $ tBinds binds
         tctx' = M.foldrWithKey
@@ -237,9 +238,19 @@ getTypeM tctx (RepTree _ (ALet binds exp)) = do
 
     let boundVarTypes = (snd <$>) <$> boundVarUni
 
-    let tctx'' = foldr
-                (\(name, ty) tctx -> tctx { varTypes = M.insert name ty $ varTypes tctx })
-                tctx' boundVarTypes
+    tctx'' <- liftEither $ foldr
+                (\(name, ty) ct ->
+                    ct >>= (\tctx ->
+                        case M.lookup name $ varTypes tctx of
+                            Nothing -> Right $ insertVar name ty tctx
+                            Just ty' -> do
+                                sub <- unifyMonos (inner ty) (inner ty')
+                                if applySub sub (inner ty) == inner ty'
+                                    then Right tctx
+                                    else Left $ PolyTypeMismatch ty ty'
+                    )
+                )
+                (Right tctx') boundVarTypes
 
     (tSub, res) <- getTypeM tctx'' exp
 
