@@ -1,6 +1,7 @@
 module TestLib
     ( unitTest
     , unitTestFunc
+    , unitTestFuncPred
     ) where
 
 colRed = "\x1b[38;5;1m"
@@ -16,9 +17,12 @@ unitTest text x y = do
         else putStrLn $ colRed ++ "\nGot:    " ++ show x ++ "\nWanted: " ++ show y
 
 unitTestFunc :: (Show a, Show b, Eq b) => String -> (a -> b) -> a -> b -> IO ()
-unitTestFunc name fn x y = do
+unitTestFunc name fn x y = unitTestFuncPred name fn (==) x y
+
+unitTestFuncPred :: (Show a, Show b) => String -> (a -> b) -> (b -> b -> Bool) -> a -> b -> IO ()
+unitTestFuncPred name fn pred x y = do
     putStr $ colBlue ++ name ++ " " ++ show x ++ " == " ++ show y ++ "... "
     let y' = fn x
-    if y' == y
+    if pred y' y
         then putStrLn $ colGreen ++ "Test passed"
         else putStrLn $ colRed ++ "\nGot:    " ++ show y' ++ "\nWanted: " ++ show y
