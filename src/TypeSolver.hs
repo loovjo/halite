@@ -40,6 +40,14 @@ freshVar = do
     modify (\tss -> tss { currentVarID = succ current })
     return (varNames !! current)
 
+updateState :: S.Set String -> ExceptT e (State TypeSolverState) ()
+updateState names = do
+    current <- (varNames !!) <$> currentVarID <$> get
+    if S.member current names
+        then freshVar >> updateState (S.delete current names)
+        else return ()
+
+
 emptySub = Substitution M.empty
 
 compose :: Substitution -> Substitution -> Either TypeError Substitution
@@ -216,17 +224,23 @@ getTypeM tctx (RepTree ctx (ACall fs)) = do
     let xType' = applySub s1 xType
     let fType' = applySub s2 fType
 
+    let s1' = Substitution $ M.withoutKeys (subMap s1) $ vars $ inner xType'
+        s2' = Substitution $ M.withoutKeys (subMap s2) $ vars $ inner fType'
+
     let xType'' = renameForAlls (forAll fType') xType'
 
-    s12 <- liftEither (s1 `compose` s2)
+    updateState $ forAll xType''
+
+    s12 <- liftEither (s1' `compose` s2')
 
     resName <- freshVar
 
     sub <- liftEither $ unifyMonos (inner fType') (TFunction (inner xType'') (TVar resName))
 
     let res = applySub sub (TVar resName)
-        fa = forAll fType `S.difference` M.keysSet (subMap sub)
-        sub' = Substitution $ M.delete resName $ subMap sub
+        fa = (forAll fType' `S.union` forAll xType'') `S.difference` M.keysSet (subMap sub)
+        toRemove = S.insert resName (forAll fType' `S.union` forAll xType'')
+        sub' = Substitution $ M.withoutKeys (subMap sub) toRemove
 
     subRes <- liftEither (s12 `compose` sub')
 
