@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5096ad1280da51eca868aaa80a6603dd5c9fb5db6e05d03aedeca684b094008b
+-- hash: 0c4a773bd76777d718d7784f4942047e2314262b4761294bf6c3eb33b892128b
 
 name:           halite
 version:        0.1.0.0
@@ -27,6 +27,7 @@ source-repository head
 library
   exposed-modules:
       Ast
+      Dst
       HighRep
       Lib
       Parse
