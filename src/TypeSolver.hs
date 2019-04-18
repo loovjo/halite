@@ -47,6 +47,12 @@ updateState names = do
         then freshVar >> updateState (S.delete current names)
         else return ()
 
+usedVars :: ExceptT e (State TypeSolverState) (S.Set String)
+usedVars = do
+    current <- currentVarID <$> get
+    return $ S.fromList $ (varNames !!) <$> [0..current-1]
+
+
 
 emptySub = Substitution M.empty
 
@@ -66,6 +72,24 @@ compose s1 s2 =
 
                 s <- compose s1' s2'
                 compose s sub
+
+renameVars :: S.Set String -> MonoType -> Substitution
+renameVars taken ty =
+    let update var (newNames, subs) =
+            let allNames = S.union taken newNames
+            in if var `S.member` allNames
+                then
+                    let newName =
+                            head $
+                                filter (not . flip S.member (S.union allNames (vars ty))) varNames
+                        sub = Substitution $ M.singleton var (TVar newName)
+                        -- TODO: This might fail?
+                        Right subs' = subs `compose` Substitution (M.singleton var (TVar newName))
+                    in (S.insert newName newNames, subs')
+                else
+                    (newNames, subs)
+        (_, sub) = foldr update (S.empty, emptySub) (vars ty)
+    in sub
 
 
 class Substitutable a where
@@ -203,6 +227,7 @@ getTypeM tctx (RepTree _ (AConstructor name)) =
 getTypeM tctx (RepTree _ (ALambda [] body)) = getTypeM tctx body
 getTypeM tctx (RepTree x (ALambda (var:vars) body)) = do
     newVar <- freshVar
+
     let tctx' = insertVar var (PolyType {forAll=S.empty, inner=TVar newVar}) tctx
 
     (sub, bodyT) <- getTypeM tctx' (RepTree x (ALambda vars body))
@@ -227,9 +252,11 @@ getTypeM tctx (RepTree ctx (ACall fs)) = do
     let s1' = Substitution $ M.withoutKeys (subMap s1) $ vars $ inner xType'
         s2' = Substitution $ M.withoutKeys (subMap s2) $ vars $ inner fType'
 
-    let xType'' = renameForAlls (forAll fType') xType'
+    used <- usedVars
 
-    updateState $ forAll xType''
+    let xType'' = renameForAlls used xType'
+
+    updateState $ vars $ inner xType''
 
     s12 <- liftEither (s1' `compose` s2')
 
@@ -244,8 +271,9 @@ getTypeM tctx (RepTree ctx (ACall fs)) = do
 
     subRes <- liftEither (s12 `compose` sub')
 
+    let resT = PolyType { forAll = fa, inner = res }
 
-    return (subRes, PolyType { forAll = fa, inner = res })
+    return (subRes, resT)
 
 
 getTypeM tctx (RepTree _ (ALet binds exp)) = do
