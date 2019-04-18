@@ -81,7 +81,7 @@ testUnifyMonos = do
         )
         ( Right $ Substitution $
             M.fromList
-                [ ("c", TVar "a")
+                [ ("a", TVar "c")
                 , ("e", (TConstructor "List" [TVar "c"]))
                 ]
         )
@@ -89,19 +89,22 @@ testUnifyMonos = do
 gtTest :: T.Text -> PolyType -> IO ()
 gtTest code wanted = do
     case doParse parseAst code 0 of
+        Right (ast, r) | r == T.length code ->
+            let dst = ast2dst ast
+                t1 = lowerForAlls <$> snd <$> getType defaultContext dst
+            in unitTest ("`" ++ T.unpack code ++ "` has type " ++ show wanted)
+                    t1 (Right $ lowerForAlls wanted)
         Left e -> do
             putStrLn "\x1b[48;5;1mCouldn't parse input!"
             putStrLn $ "> " ++ T.unpack code
             putStrLn $ show e
-        Right (ast, _) ->
-            let dst = ast2dst ast
-                t1 = getType defaultContext dst
-            in unitTest ("`" ++ T.unpack code ++ "` has type " ++ show wanted)
-                    ((second lowerForAlls) <$> t1) (Right (emptySub, (lowerForAlls wanted)))
+        _ -> do
+            putStrLn "\x1b[48;5;1mCouldn't parse input!"
+            putStrLn $ "> " ++ T.unpack code
 
 testGetType = do
     gtTest "5" (bindFrees $ TConstructor "Int" [])
-    gtTest "add 5 7" (bindFrees $ TConstructor "Int" [])
+    gtTest "5+7" (bindFrees $ TConstructor "Int" [])
     gtTest "\\x. cons x empty" (bindFrees $ TFunction (TVar "a") (TConstructor "List" [TVar "a"]) )
     gtTest "\\f x. f x"
         (bindFrees $
@@ -109,7 +112,7 @@ testGetType = do
                 (TFunction (TVar "a") (TVar "b"))
                 (TFunction (TVar "a") (TVar "b"))
         )
-    gtTest "map (\\x. empty)"
+    gtTest "map(\\x.empty)"
         ( bindFrees $
             TFunction
                 (TConstructor "List" [TVar "a"])
@@ -123,16 +126,30 @@ testGetType = do
                 (TConstructor "List" [TVar "a"])
         )
 
-    gtTest "\\lst. map inc lst"
+    gtTest "\\l.map(\\a.a+1)l"
         ( bindFrees $
             TFunction
                 (TConstructor "List" [TConstructor "Int" []])
                 (TConstructor "List" [TConstructor "Int" []])
         )
 
-    gtTest "\\lst. map (cons 1) lst"
+    gtTest "\\l.map(cons 1)l"
         ( bindFrees $
             TFunction
                 (TConstructor "List" [TConstructor "List" [TConstructor "Int" []]])
                 (TConstructor "List" [TConstructor "List" [TConstructor "Int" []]])
+        )
+
+    gtTest "let combine::(b->c)->(a->b)->a->c in combine (\\a.a+1) (\\a.a*2)"
+        ( bindFrees $
+            TFunction
+                (TConstructor "Int" [])
+                (TConstructor "Int" [])
+        )
+
+    gtTest "let combine::(b->c)->(a->b)->a->c in combine (map (\\a.a+1)) (map (\\a.a+1))"
+        ( bindFrees $
+            TFunction
+                (TConstructor "List" [TConstructor "Int" []])
+                (TConstructor "List" [TConstructor "Int" []])
         )
