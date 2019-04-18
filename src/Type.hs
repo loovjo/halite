@@ -1,6 +1,5 @@
 module Type where
 
-import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Monad
 import Data.List
@@ -82,14 +81,6 @@ renameForAlls taken p =
                     in (ty', S.insert var' (S.delete var fa))
                 else (ty, fa)
         (ty, fa) = foldr update (inner p, forAll p) (forAll p)
-
-combinePoly :: (MonoType -> MonoType -> MonoType) -> PolyType -> PolyType -> PolyType
-combinePoly f p1 p2 =
-    let p2' = renameForAlls (forAll p1) p2
-    in PolyType {
-        forAll = forAll p1 `S.union` forAll p2,
-        inner = inner p1 `f` inner p2
-    }
 
 lowerForAlls :: PolyType -> PolyType
 lowerForAlls p =

@@ -30,7 +30,7 @@ indentOf :: Int -> String
 indentOf x = take (x * 4) $ cycle " "
 
 apprint :: Int -> Ast -> String
-apprint i (RepTree ctx part) =
+apprint i (RepTree _ part) =
     appprint part
     where
         indent = indentOf i
@@ -58,13 +58,3 @@ ppbind i bind =
     case bind of
         AVBind v e -> v ++ " = " ++ apprint (i + 2) e ++ ";"
         ATBind v t -> v ++ " :: " ++ show t
-
-vBinds :: [ABind] -> [(String, Ast)]
-vBinds [] = []
-vBinds (AVBind name ast : rest) = (name, ast) : vBinds rest
-vBinds (_ : rest) = vBinds rest
-
-tBinds :: [ABind] -> [(String, PolyType)]
-tBinds [] = []
-tBinds (ATBind name ty : rest) = (name, ty) : tBinds rest
-tBinds (_ : rest) = tBinds rest

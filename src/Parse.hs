@@ -8,10 +8,8 @@ import Type
 import RepTree
 
 import qualified Data.Text as T
-import qualified Data.Map as M
 import Data.Char
 import Data.List
-import Data.Traversable
 import Control.Applicative
 
 reserved = ["let", "in", "match"]

@@ -56,7 +56,7 @@ eimap' f x =
 
 instance Applicative (Parser e) where
     pure val =
-        Parser { doParse = \inp idx -> Right (val, idx) }
+        Parser { doParse = \_ idx -> Right (val, idx) }
 
     p1 <*> p2 =
         Parser {
@@ -70,7 +70,7 @@ instance Applicative (Parser e) where
             }
 
 epure err =
-    Parser { doParse = \inp idx -> Left [(err, idx)] }
+    Parser { doParse = \_ idx -> Left [(err, idx)] }
 
 instance Monad (Parser e) where
     return = pure
@@ -102,7 +102,7 @@ noErr parser =
         doParse = \inp idx ->
             case doParse parser inp idx of
                 Right a -> Right a
-                Left es -> Left []
+                Left _ -> Left []
     }
 
 groupErrs :: ParseError e => [(e, Int)] -> [(e, Int)]

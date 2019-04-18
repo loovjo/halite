@@ -1,6 +1,5 @@
 module RepTree
-    (RepTree
-    , RepTree(..)
+    ( RepTree(..)
     ) where
 
 data RepTree ctx cnt =

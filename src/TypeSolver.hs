@@ -5,14 +5,11 @@ module TypeSolver where
 import Data.List
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
-import Control.Applicative
 import Control.Monad.State.Lazy
 import Control.Monad.Except
 
-import Debug.Trace
-
 import Type
-import Ast
+import Dst
 import RepTree
 
 data Substitution =
@@ -72,25 +69,6 @@ compose s1 s2 =
 
                 s <- compose s1' s2'
                 compose s sub
-
-renameVars :: S.Set String -> MonoType -> Substitution
-renameVars taken ty =
-    let update var (newNames, subs) =
-            let allNames = S.union taken newNames
-            in if var `S.member` allNames
-                then
-                    let newName =
-                            head $
-                                filter (not . flip S.member (S.union allNames (vars ty))) varNames
-                        sub = Substitution $ M.singleton var (TVar newName)
-                        -- TODO: This might fail?
-                        Right subs' = subs `compose` Substitution (M.singleton var (TVar newName))
-                    in (S.insert newName newNames, subs')
-                else
-                    (newNames, subs)
-        (_, sub) = foldr update (S.empty, emptySub) (vars ty)
-    in sub
-
 
 class Substitutable a where
     applySub :: Substitution -> a -> a
@@ -207,42 +185,38 @@ defaultContext =
             ]
     }
 
-getType :: TypeContext -> Ast -> Either TypeError (Substitution, PolyType)
+getType :: TypeContext -> Dst -> Either TypeError (Substitution, PolyType)
 getType tctx a =
     fst $ runState (runExceptT $ getTypeM tctx a) initTypeSolverState
 
-getTypeM _ (RepTree _ (ANum _)) =
+getTypeM _ (RepTree _ (DNum _)) =
     return (emptySub, PolyType {forAll=S.empty, inner=TConstructor "Int" []})
 
-getTypeM tctx (RepTree _ (AVar name)) =
+getTypeM tctx (RepTree _ (DVar name)) =
     case M.lookup name $ varTypes tctx of
         Just ty -> return (emptySub, ty)
         Nothing -> throwError $ UnboundVar name
 
-getTypeM tctx (RepTree _ (AConstructor name)) =
+getTypeM tctx (RepTree _ (DConstructor name)) =
     case M.lookup name $ varTypes tctx of
         Just ty -> return (emptySub, ty)
         Nothing -> throwError $ UnboundVar name
 
-getTypeM tctx (RepTree _ (ALambda [] body)) = getTypeM tctx body
-getTypeM tctx (RepTree x (ALambda (var:vars) body)) = do
+getTypeM tctx (RepTree _ (DLambda var body)) = do
     newVar <- freshVar
 
     let tctx' = insertVar var (PolyType {forAll=S.empty, inner=TVar newVar}) tctx
 
-    (sub, bodyT) <- getTypeM tctx' (RepTree x (ALambda vars body))
+    (sub, bodyT) <- getTypeM tctx' body
 
     let varT = applySub sub (TVar newVar)
         sub' = Substitution $ M.delete newVar $ subMap sub
+        fa = vars varT `S.union` forAll bodyT
 
-    return (sub', combinePoly TFunction (bindFrees varT) bodyT)
+    return (sub', PolyType {forAll=fa, inner=TFunction varT $ inner bodyT})
 
 
-getTypeM tctx (RepTree _ (ACall [f])) = getTypeM tctx f
-getTypeM tctx (RepTree ctx (ACall fs)) = do
-    let f = RepTree ctx (ACall (init fs))
-        x = last fs
-
+getTypeM tctx (RepTree _ (DCall f x)) = do
     (s1, fType) <- getTypeM tctx f
     (s2, xType) <- getTypeM tctx x
 
@@ -276,14 +250,12 @@ getTypeM tctx (RepTree ctx (ACall fs)) = do
     return (subRes, resT)
 
 
-getTypeM tctx (RepTree _ (ALet binds exp)) = do
-    let boundTypes = M.fromList $ tBinds binds
-        tctx' = M.foldrWithKey
+getTypeM tctx (RepTree _ (DLet tbinds vbinds exp)) = do
+    let tctx' = M.foldrWithKey
                 (\name ty tctx -> tctx { varTypes = M.insert name ty $ varTypes tctx })
-                tctx boundTypes
-        boundVars = vBinds binds
+                tctx $ M.fromList tbinds
 
-    boundVarUni <- sequence $ (\(name, val) -> (name, ) <$> getTypeM tctx' val) <$> boundVars
+    boundVarUni <- sequence $ (\(name, val) -> (name, ) <$> getTypeM tctx' val) <$> vbinds
 
     let subs = (fst . snd) <$> boundVarUni
     composed <- liftEither $ foldr (\sub composed -> composed >>= compose sub) (Right emptySub) subs
@@ -307,6 +279,6 @@ getTypeM tctx (RepTree _ (ALet binds exp)) = do
 
     (tSub, res) <- getTypeM tctx'' exp
 
-    rSub <- liftEither $ composed `compose` composed
+    rSub <- liftEither $ composed `compose` tSub
 
     return (rSub, applySub composed res)

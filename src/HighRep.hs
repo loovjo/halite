@@ -1,12 +1,8 @@
 module HighRep where
 
-import qualified Data.Set as S
-import qualified Data.Map.Strict as M
 import RepTree
 import Type
 import Ast
-
-import Data.List
 
 
 type Program = [HighBind]

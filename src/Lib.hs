@@ -1,16 +1,15 @@
 module Lib where
 
 import Ast
+import Dst
 import Parse
 import Parser
-import HighRep
-import Type
 import TypeSolver
 
 import System.IO
 import qualified Data.Text as T
 
-showErr i [] (err, idx) = do
+showErr i [] (err, _) = do
     putStrLn $ show (i + 1) ++ " | " ++ show err
     putStrLn ""
 
@@ -38,7 +37,9 @@ repl =
                     if len == T.length inp
                         then do
                             putStrLn $ "Parsed: " ++ apprint 0 ast
-                            case getType defaultContext ast of
+                            let dst = ast2dst ast
+                            putStrLn $ "Dst: " ++ show dst
+                            case getType defaultContext dst of
                                 Right (ctx', ty) ->
                                     putStrLn $ "Type: " ++ show ty ++ ", ctx: " ++ show ctx'
                                 Left e ->
