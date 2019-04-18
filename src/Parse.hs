@@ -13,6 +13,7 @@ import Data.List
 import Control.Applicative
 
 reserved = ["let", "in", "match"]
+sigils = "+-*/!&#$%~@^|<>.;:?"
 
 data HParseError
     = UnexpectedEnd
@@ -36,7 +37,7 @@ instance ParseError HParseError where
                 _ -> Nothing
             else Nothing
 
-intoParseAst :: Parser HParseError AstBranch -> Parser HParseError Ast
+intoParseAst :: Parser HParseError x -> Parser HParseError (RepTree AstCtx x)
 intoParseAst parser =
     Parser {
         doParse = \t i ->
@@ -64,7 +65,8 @@ parseLazy =
 parseAst :: Parser HParseError Ast
 parseAst =
     token $ foldl1' (<|>)
-        [ parseCall
+        [ parseBinOps
+        , parseCall
         , parseLet
         , parseLambda
         , parseVar
@@ -84,6 +86,21 @@ parseNum = intoParseAst (ANum <$> matchInt)
 
 parseConstructor :: Parser HParseError Ast
 parseConstructor = intoParseAst (AConstructor <$> matchCName)
+
+parseBinOps :: Parser HParseError Ast
+parseBinOps = intoParseAst inner
+    where
+        inner = do
+            first <- token parseLazy
+            ops <- some ((,) <$> token parseBinOp <*> token parseLazy)
+            return $ ABinOps first ops
+
+parseBinOp :: Parser HParseError BinOp
+parseBinOp = intoParseAst inner
+    where
+        inner = do
+            sigil <- some (matchAnyChars sigils)
+            return $ BNamed sigil
 
 parseLet :: Parser HParseError Ast
 parseLet = intoParseAst parseLetBranch

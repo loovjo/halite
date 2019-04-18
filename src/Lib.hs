@@ -38,7 +38,7 @@ repl =
                         then do
                             putStrLn $ "Parsed: " ++ apprint 0 ast
                             let dst = ast2dst ast
-                            putStrLn $ "Dst: " ++ show dst
+                            putStrLn $ "Dst: " ++ dpprint dst
                             case getType defaultContext dst of
                                 Right (ctx', ty) ->
                                     putStrLn $ "Type: " ++ show ty ++ ", ctx: " ++ show ctx'

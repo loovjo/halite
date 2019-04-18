@@ -14,6 +14,12 @@ data AstBranch
     | ALet [ABind] Ast
     | ALambda [String] Ast
     | ACall [Ast]
+    | ABinOps Ast [(BinOp, Ast)]
+
+type BinOp = RepTree AstCtx BinOpContent
+
+data BinOpContent
+    = BNamed String
 
 instance Show AstBranch where
     show = apprint 0 . RepTree (AstCtx {cspan=(-1,-1)})
@@ -52,6 +58,14 @@ apprint i (RepTree _ part) =
                 ACall fs ->
                     let ppfs = concatMap (\v -> apprint (i + 1) v ++ " ") fs
                     in "(" ++ (take (length ppfs - 1) ppfs) ++ ")"
+                ABinOps first ops ->
+                    let pfst = "(" ++ apprint (i+1) first ++ ")"
+                        pops =
+                            concatMap
+                                (\(RepTree _ (BNamed op), a) ->
+                                    " " ++ op ++ " (" ++ apprint (i+1) a ++ ")"
+                                ) ops
+                    in pfst ++ pops
 
 ppbind :: Int -> ABind -> String
 ppbind i bind =
