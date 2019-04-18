@@ -29,7 +29,7 @@ data TypeSolverState =
     deriving (Show)
 
 -- Start with cvid = 2 to avoid collisions with defaultContext
-initTypeSolverState = TypeSolverState { currentVarID = 2 }
+initTypeSolverState = TypeSolverState { currentVarID = 3 }
 
 freshVar :: ExceptT e (State TypeSolverState) String
 freshVar = do
@@ -107,16 +107,15 @@ insertVar name ty tctx =
 
 
 unifyMonos :: MonoType -> MonoType -> Either TypeError Substitution
-
 unifyMonos (TVar a) (TVar b) =
     if a == b
         then Right emptySub
-        else Right $ Substitution $ M.singleton a (TVar b)
-unifyMonos (TVar a) x =
+        else Right $ Substitution $ M.singleton b (TVar a)
+unifyMonos x (TVar a) =
     if S.member a $ vars x
         then Left $ InfiniteType a x
         else Right $ Substitution $ M.singleton a x
-unifyMonos x (TVar a) =
+unifyMonos (TVar a) x =
     if S.member a $ vars x
         then Left $ InfiniteType a x
         else Right $ Substitution $ M.singleton a x
@@ -138,7 +137,13 @@ unifyMonos a b
     | otherwise = Left $ MonoTypeMismatch a b
 
 defaultContext =
-    TypeContext {
+    let i2i = PolyType {
+                forAll = S.empty,
+                inner=TFunction
+                    (TConstructor "Int" [])
+                    (TFunction (TConstructor "Int" []) (TConstructor "Int" []))
+                }
+    in TypeContext {
         varTypes = M.fromList
             [ ("empty", PolyType {forAll=S.singleton "a", inner=TConstructor "List" [TVar "a"]})
             , ("cons", PolyType {
@@ -161,25 +166,35 @@ defaultContext =
                             (TConstructor "List" [TVar "b"])
                 })
             , ("id", PolyType { forAll = S.singleton "a", inner=TFunction (TVar "a") (TVar "a")})
-            , ("add", PolyType {
-                forAll = S.empty,
-                inner=TFunction
-                    (TConstructor "Int" [])
-                    (TFunction (TConstructor "Int" []) (TConstructor "Int" []))
-                } )
             , ("inc", PolyType {
-                forAll = S.empty,
-                inner=TFunction
-                    (TConstructor "Int" [])
-                    (TConstructor "Int" [])
-                } )
-            , ("revApp", PolyType {
+                forAll=S.empty,
+                inner =
+                    TFunction
+                        (TConstructor "Int" [])
+                        (TConstructor "Int" [])
+                })
+            , ("+", i2i)
+            , ("-", i2i)
+            , ("*", i2i)
+            , ("/", i2i)
+            , ("%", i2i)
+            , ("^", i2i)
+            , ("$", PolyType {
                 forAll = S.fromList ["a", "b"],
                 inner=TFunction
-                    (TVar "a")
+                    (TFunction (TVar "a") (TVar "b"))
+                    (TFunction
+                        (TVar "a")
+                        (TVar "b")
+                    )
+                } )
+            , (".", PolyType {
+                forAll = S.fromList ["a", "b", "c"],
+                inner=TFunction
+                    (TFunction (TVar "b") (TVar "c"))
                     (TFunction
                         (TFunction (TVar "a") (TVar "b"))
-                        (TVar "b")
+                        (TFunction (TVar "a") (TVar "c"))
                     )
                 } )
             ]
@@ -240,8 +255,8 @@ getTypeM tctx (RepTree _ (DCall f x)) = do
 
     let res = applySub sub (TVar resName)
         fa = (forAll fType' `S.union` forAll xType'') `S.difference` M.keysSet (subMap sub)
-        toRemove = S.insert resName (forAll fType' `S.union` forAll xType'')
-        sub' = Substitution $ M.withoutKeys (subMap sub) toRemove
+        free = S.fromList $ concatMap (S.toList . freeVars) $ M.elems $ varTypes tctx
+        sub' = Substitution $ M.restrictKeys (subMap sub) free
 
     subRes <- liftEither (s12 `compose` sub')
 
