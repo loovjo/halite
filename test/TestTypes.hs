@@ -24,6 +24,10 @@ testVars = do
         (TConstructor "T" [TVar "a", TVar "b", TVar "c"])
         (S.fromList ["a", "b", "c"])
 
+    unitTestFunc "vars" vars
+        (TConstructor "List" [(TConstructor "List" [TVar "a"])])
+        (S.singleton "a")
+
 testFreeVars = do
     unitTestFunc "freeVars" freeVars
         (PolyType {inner = TVar "a", forAll=S.empty })

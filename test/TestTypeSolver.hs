@@ -6,9 +6,12 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 import qualified Data.Text as T
 
+import Control.Arrow
+
 import TestLib
 
 import Ast
+import Dst
 import Parse
 import Parser
 import Type
@@ -83,19 +86,6 @@ testUnifyMonos = do
                 ]
         )
 
-tyEq (Right (s1, t1)) (Right (s2, t2)) =
-    let tMatch = case unifyMonos (inner t1) (inner t2) of
-                Left _ -> False
-                Right sub ->
-                    let nonVars = M.filter (\v ->
-                            case v of
-                                TVar _ -> False
-                                _ -> True
-                            ) (subMap sub)
-                    in M.size nonVars == 0
-    in s1 == s2 && tMatch
-tyEq _ _ = False
-
 gtTest :: T.Text -> PolyType -> IO ()
 gtTest code wanted = do
     case doParse parseAst code 0 of
@@ -104,15 +94,45 @@ gtTest code wanted = do
             putStrLn $ "> " ++ T.unpack code
             putStrLn $ show e
         Right (ast, _) ->
-            unitTestFuncPred "getType" (getType defaultContext) tyEq
-                ast (Right (emptySub, wanted))
+            let dst = ast2dst ast
+                t1 = getType defaultContext dst
+            in unitTest ("`" ++ T.unpack code ++ "` has type " ++ show wanted)
+                    ((second lowerForAlls) <$> t1) (Right (emptySub, (lowerForAlls wanted)))
 
 testGetType = do
     gtTest "5" (bindFrees $ TConstructor "Int" [])
     gtTest "add 5 7" (bindFrees $ TConstructor "Int" [])
     gtTest "\\x. cons x empty" (bindFrees $ TFunction (TVar "a") (TConstructor "List" [TVar "a"]) )
+    gtTest "\\f x. f x"
+        (bindFrees $
+            TFunction
+                (TFunction (TVar "a") (TVar "b"))
+                (TFunction (TVar "a") (TVar "b"))
+        )
     gtTest "map (\\x. empty)"
         ( bindFrees $
-            TFunction (TConstructor "List" [TVar "a"])
+            TFunction
+                (TConstructor "List" [TVar "a"])
                 (TConstructor "List" [TConstructor "List" [TVar "b"]])
+        )
+
+    gtTest "let head :: List a -> a in \\lst. map head lst"
+        ( bindFrees $
+            TFunction
+                (TConstructor "List" [TConstructor "List" [TVar "a"]])
+                (TConstructor "List" [TVar "a"])
+        )
+
+    gtTest "\\lst. map inc lst"
+        ( bindFrees $
+            TFunction
+                (TConstructor "List" [TConstructor "Int" []])
+                (TConstructor "List" [TConstructor "Int" []])
+        )
+
+    gtTest "\\lst. map (cons 1) lst"
+        ( bindFrees $
+            TFunction
+                (TConstructor "List" [TConstructor "List" [TConstructor "Int" []]])
+                (TConstructor "List" [TConstructor "List" [TConstructor "Int" []]])
         )
